@@ -246,6 +246,25 @@ String twoDigits(int value) {
   return String(value);
 }
 
+
+String format12Hour(int hour) {
+  int hour12 = hour % 12;
+  if (hour12 == 0) hour12 = 12;
+  return twoDigits(hour12);
+}
+
+String meridiemLabel(int hour) {
+  return hour < 12 ? "AM" : "PM";
+}
+
+void printCenteredText(const String& text, int16_t centerX, int16_t y, uint8_t textSize, uint16_t color, uint16_t bg) {
+  tft.setTextSize(textSize);
+  tft.setTextColor(color, bg);
+  int16_t x = centerX - (tft.textWidth(text) / 2);
+  tft.setCursor(x, y);
+  tft.print(text);
+}
+
 String turkishDayName(int weekDay) {
   switch (weekDay) {
     case 0: return "Pazar";
@@ -291,34 +310,33 @@ void updateClockUI() {
   struct tm timeInfo;
   bool timeReady = getLocalTime(&timeInfo, 100);
 
-  tft.fillRect(44, 82, 232, 66, colorPanel);
-  tft.setTextColor(colorText, colorPanel);
-  tft.setTextSize(5);
-  tft.setCursor(54, 88);
+  // Kartin icini tamamen temizle. Boylece onceki tarih/gun yazilarindan
+  // kalan parcalar ekranda yarim gorunmez.
+  tft.fillRect(34, 78, 252, 80, colorPanel);
 
   if (timeReady) {
-    tft.print(twoDigits(timeInfo.tm_hour) + ":" + twoDigits(timeInfo.tm_min));
+    String clockText = format12Hour(timeInfo.tm_hour) + ":" + twoDigits(timeInfo.tm_min);
+    String dateText = twoDigits(timeInfo.tm_mday) + "." + twoDigits(timeInfo.tm_mon + 1) + "." +
+                      String(timeInfo.tm_year + 1900);
+    String dayText = turkishDayName(timeInfo.tm_wday);
+
+    tft.setTextSize(5);
+    tft.setTextColor(colorText, colorPanel);
+    tft.setCursor(46, 88);
+    tft.print(clockText);
+
     tft.setTextSize(2);
-    tft.setCursor(220, 116);
     tft.setTextColor(colorMuted, colorPanel);
+    tft.setCursor(240, 101);
+    tft.print(meridiemLabel(timeInfo.tm_hour));
+    tft.setCursor(240, 123);
     tft.print(twoDigits(timeInfo.tm_sec));
 
-    tft.setTextSize(2);
-    tft.setCursor(86, 136);
-    tft.setTextColor(colorWarn, colorPanel);
-    tft.print(twoDigits(timeInfo.tm_mday) + "." + twoDigits(timeInfo.tm_mon + 1) + "." +
-              String(timeInfo.tm_year + 1900));
-
-    tft.setTextSize(1);
-    tft.setCursor(136, 154);
-    tft.setTextColor(colorMuted, colorPanel);
-    tft.print(turkishDayName(timeInfo.tm_wday));
+    printCenteredText(dateText, screenWidth / 2, 136, 2, colorWarn, colorPanel);
+    printCenteredText(dayText, screenWidth / 2, 154, 1, colorMuted, colorPanel);
   } else {
-    tft.print("--:--");
-    tft.setTextSize(1);
-    tft.setCursor(73, 145);
-    tft.setTextColor(colorWarn, colorPanel);
-    tft.print("Saat icin WiFi/NTP bekleniyor");
+    printCenteredText("--:--", screenWidth / 2, 92, 5, colorText, colorPanel);
+    printCenteredText("Saat icin WiFi/NTP bekleniyor", screenWidth / 2, 145, 1, colorWarn, colorPanel);
   }
 
   tft.fillRect(0, 222, screenWidth, 18, 0x18E3);

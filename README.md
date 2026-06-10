@@ -11,6 +11,7 @@ ESP32 + TFT_eSPI ekran ile Moonraker/Klipper yazıcı durumunu izleyen Arduino p
 - Tüm ekranı sürekli silmek yerine sadece değişen alanları güncelleyerek titreme/yanıp sönmeyi azaltır.
 - WiFi koparsa bloklamadan tekrar bağlanmayı dener.
 - Moonraker erişilemezse yazıcı ekranından masa saati ekranına geçer.
+- Masa saati 12 saatlik formatta saat, saniye, tarih ve gün adını gösterir.
 - Yazıcı yeniden erişilebilir olduğunda otomatik olarak yazıcı paneline döner.
 - Moonraker HTTP veya JSON hatalarını ekranda kısa durum mesajı olarak gösterir.
 
