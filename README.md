@@ -7,6 +7,8 @@ ESP32 + TFT_eSPI ekran ile Moonraker/Klipper yazıcı durumunu izleyen Arduino p
 - Hotend ve yatak sıcaklıklarını hedef değerleriyle birlikte gösterir.
 - Baskı ilerlemesini ve tahmini kalan süreyi hesaplar.
 - Dosya adını, yazıcı durumunu ve WiFi/IP bilgisini ekranda gösterir.
+- Kart tabanlı, daha okunaklı ve renkli bir arayüz kullanır.
+- Tüm ekranı sürekli silmek yerine sadece değişen alanları güncelleyerek titreme/yanıp sönmeyi azaltır.
 - WiFi koparsa bloklamadan tekrar bağlanmayı dener.
 - Moonraker HTTP veya JSON hatalarını ekranda kısa durum mesajı olarak gösterir.
 
