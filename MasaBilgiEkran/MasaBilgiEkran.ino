@@ -17,10 +17,12 @@ const uint16_t moonrakerPort = 7125;
 // Ekran ve zamanlama ayarlari
 const uint16_t screenWidth = 320;
 const uint16_t screenHeight = 240;
-const unsigned long dataRefreshMs = 3000;
+const unsigned long dataRefreshMs = 2000;
 const unsigned long wifiRetryMs = 5000;
 const unsigned long requestTimeoutMs = 1000;
 const unsigned long clockRefreshMs = 1000;
+const unsigned long printerLostGraceMs = 15000;
+const uint8_t printerOfflineConfirmCount = 4;
 
 // Saat/tarih icin NTP ayarlari. Turkiye icin UTC+3 kullanilir.
 const char* ntpServer = "pool.ntp.org";
@@ -56,6 +58,8 @@ unsigned long lastDataRefresh = 0;
 unsigned long lastWifiRetry = 0;
 bool lastFetchOk = false;
 unsigned long lastClockRefresh = 0;
+unsigned long lastSuccessfulDataMs = 0;
+uint8_t consecutiveFetchFailures = 0;
 
 enum ScreenMode {
   SCREEN_NONE,
@@ -430,6 +434,39 @@ bool getData() {
   return updatePrinterDataFromJson(payload);
 }
 
+
+bool shouldShowClockScreen() {
+  if (lastSuccessfulDataMs == 0) {
+    return true;
+  }
+
+  return consecutiveFetchFailures >= printerOfflineConfirmCount &&
+         millis() - lastSuccessfulDataMs >= printerLostGraceMs;
+}
+
+void handleFetchResult(bool fetchOk) {
+  lastFetchOk = fetchOk;
+
+  if (fetchOk) {
+    consecutiveFetchFailures = 0;
+    lastSuccessfulDataMs = millis();
+    updatePrinterUI();
+    return;
+  }
+
+  if (consecutiveFetchFailures < 255) {
+    consecutiveFetchFailures++;
+  }
+
+  if (activeScreen == SCREEN_PRINTER && !shouldShowClockScreen()) {
+    updateFooter();
+    return;
+  }
+
+  updateClockUI();
+  lastClockRefresh = millis();
+}
+
 void setup() {
   Serial.begin(115200);
   tft.init();
@@ -446,16 +483,10 @@ void loop() {
 
   if (lastDataRefresh == 0 || millis() - lastDataRefresh >= dataRefreshMs) {
     lastDataRefresh = millis();
-    lastFetchOk = getData();
-    if (lastFetchOk) {
-      updatePrinterUI();
-    } else {
-      updateClockUI();
-      lastClockRefresh = millis();
-    }
+    handleFetchResult(getData());
   }
 
-  if (!lastFetchOk && millis() - lastClockRefresh >= clockRefreshMs) {
+  if (!lastFetchOk && activeScreen != SCREEN_PRINTER && millis() - lastClockRefresh >= clockRefreshMs) {
     lastClockRefresh = millis();
     updateClockUI();
   }
