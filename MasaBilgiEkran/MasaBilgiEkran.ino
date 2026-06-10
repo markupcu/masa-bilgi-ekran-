@@ -4,6 +4,7 @@
 #include <TFT_eSPI.h>
 #include <WiFi.h>
 #include <math.h>
+#include <time.h>
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -18,7 +19,13 @@ const uint16_t screenWidth = 320;
 const uint16_t screenHeight = 240;
 const unsigned long dataRefreshMs = 3000;
 const unsigned long wifiRetryMs = 5000;
-const unsigned long requestTimeoutMs = 2500;
+const unsigned long requestTimeoutMs = 1000;
+const unsigned long clockRefreshMs = 1000;
+
+// Saat/tarih icin NTP ayarlari. Turkiye icin UTC+3 kullanilir.
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffsetSec = 3 * 3600;
+const int daylightOffsetSec = 0;
 
 // Renk paleti
 const uint16_t colorBg = 0x0841;
@@ -48,7 +55,15 @@ PrinterData printer;
 unsigned long lastDataRefresh = 0;
 unsigned long lastWifiRetry = 0;
 bool lastFetchOk = false;
-bool layoutDrawn = false;
+unsigned long lastClockRefresh = 0;
+
+enum ScreenMode {
+  SCREEN_NONE,
+  SCREEN_PRINTER,
+  SCREEN_CLOCK
+};
+
+ScreenMode activeScreen = SCREEN_NONE;
 
 String moonrakerUrl() {
   return "http://" + String(moonrakerIP) + ":" + String(moonrakerPort) +
@@ -113,7 +128,7 @@ void drawCard(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t borderColor, 
   tft.print(title);
 }
 
-void drawStaticLayout() {
+void drawPrinterLayout() {
   tft.fillScreen(colorBg);
 
   // Ust kisim: koyu bir baslik ve renkli vurgu cizgisi.
@@ -133,7 +148,7 @@ void drawStaticLayout() {
   drawCard(10, 124, 300, 52, colorAccent, "BASKI ILERLEME");
   drawCard(10, 184, 300, 36, colorMuted, "AKTIF DOSYA");
 
-  layoutDrawn = true;
+  activeScreen = SCREEN_PRINTER;
 }
 
 void updateHeaderStatus() {
@@ -164,7 +179,9 @@ void updateTemperatureCard(int16_t x, int16_t y, float current, float target, ui
 
   int16_t meterWidth = map(constrain((int)current, 0, 300), 0, 300, 0, 118);
   tft.fillRoundRect(x + 12, y + 51, 118, 5, 3, colorPanelDark);
-  tft.fillRoundRect(x + 12, y + 51, meterWidth, 5, 3, accent);
+  if (meterWidth > 0) {
+    tft.fillRoundRect(x + 12, y + 51, meterWidth, 5, 3, accent);
+  }
 }
 
 void updateProgressCard() {
@@ -211,9 +228,9 @@ void updateFooter() {
   }
 }
 
-void updateUI() {
-  if (!layoutDrawn) {
-    drawStaticLayout();
+void updatePrinterUI() {
+  if (activeScreen != SCREEN_PRINTER) {
+    drawPrinterLayout();
   }
 
   updateHeaderStatus();
@@ -222,6 +239,97 @@ void updateUI() {
   updateProgressCard();
   updateFileCard();
   updateFooter();
+}
+
+String twoDigits(int value) {
+  if (value < 10) return "0" + String(value);
+  return String(value);
+}
+
+String turkishDayName(int weekDay) {
+  switch (weekDay) {
+    case 0: return "Pazar";
+    case 1: return "Pazartesi";
+    case 2: return "Sali";
+    case 3: return "Carsamba";
+    case 4: return "Persembe";
+    case 5: return "Cuma";
+    case 6: return "Cumartesi";
+    default: return "";
+  }
+}
+
+void drawClockLayout() {
+  tft.fillScreen(colorBg);
+  tft.fillRect(0, 0, screenWidth, 42, 0x18E3);
+  tft.fillRect(0, 40, screenWidth, 2, colorWarn);
+  tft.setTextColor(colorText, 0x18E3);
+  tft.setTextSize(2);
+  tft.setCursor(12, 8);
+  tft.print("MASA SAATI");
+  tft.setTextColor(colorMuted, 0x18E3);
+  tft.setTextSize(1);
+  tft.setCursor(14, 28);
+  tft.print("Yazici kapali veya ulasilamiyor");
+
+  tft.fillRoundRect(22, 62, 276, 104, 16, colorPanel);
+  tft.drawRoundRect(22, 62, 276, 104, 16, colorWarn);
+  tft.fillRoundRect(42, 178, 236, 34, 12, colorPanelDark);
+  tft.setTextColor(colorMuted, colorPanelDark);
+  tft.setTextSize(1);
+  tft.setCursor(58, 191);
+  tft.print("Yazici acilinca panele doner");
+
+  activeScreen = SCREEN_CLOCK;
+}
+
+void updateClockUI() {
+  if (activeScreen != SCREEN_CLOCK) {
+    drawClockLayout();
+  }
+
+  struct tm timeInfo;
+  bool timeReady = getLocalTime(&timeInfo, 100);
+
+  tft.fillRect(44, 82, 232, 66, colorPanel);
+  tft.setTextColor(colorText, colorPanel);
+  tft.setTextSize(5);
+  tft.setCursor(54, 88);
+
+  if (timeReady) {
+    tft.print(twoDigits(timeInfo.tm_hour) + ":" + twoDigits(timeInfo.tm_min));
+    tft.setTextSize(2);
+    tft.setCursor(220, 116);
+    tft.setTextColor(colorMuted, colorPanel);
+    tft.print(twoDigits(timeInfo.tm_sec));
+
+    tft.setTextSize(2);
+    tft.setCursor(86, 136);
+    tft.setTextColor(colorWarn, colorPanel);
+    tft.print(twoDigits(timeInfo.tm_mday) + "." + twoDigits(timeInfo.tm_mon + 1) + "." +
+              String(timeInfo.tm_year + 1900));
+
+    tft.setTextSize(1);
+    tft.setCursor(136, 154);
+    tft.setTextColor(colorMuted, colorPanel);
+    tft.print(turkishDayName(timeInfo.tm_wday));
+  } else {
+    tft.print("--:--");
+    tft.setTextSize(1);
+    tft.setCursor(73, 145);
+    tft.setTextColor(colorWarn, colorPanel);
+    tft.print("Saat icin WiFi/NTP bekleniyor");
+  }
+
+  tft.fillRect(0, 222, screenWidth, 18, 0x18E3);
+  tft.setTextColor(colorWarn, 0x18E3);
+  tft.setTextSize(1);
+  tft.setCursor(10, 228);
+  if (WiFi.status() == WL_CONNECTED) {
+    tft.print("Moonraker bekleniyor: " + String(moonrakerIP));
+  } else {
+    tft.print("WiFi tekrar baglanmayi deniyor");
+  }
 }
 
 void showSplash(const String& line1, const String& line2, uint16_t color) {
@@ -236,7 +344,7 @@ void showSplash(const String& line1, const String& line2, uint16_t color) {
   tft.setTextSize(1);
   tft.setCursor(48, 125);
   tft.print(line2);
-  layoutDrawn = false;
+  activeScreen = SCREEN_NONE;
 }
 
 void connectWiFi(bool force = false) {
@@ -311,6 +419,7 @@ void setup() {
   showSplash("WiFi baglaniyor", ssid, colorText);
 
   WiFi.mode(WIFI_STA);
+  configTime(gmtOffsetSec, daylightOffsetSec, ntpServer);
   connectWiFi(true);
 }
 
@@ -320,6 +429,16 @@ void loop() {
   if (lastDataRefresh == 0 || millis() - lastDataRefresh >= dataRefreshMs) {
     lastDataRefresh = millis();
     lastFetchOk = getData();
-    updateUI();
+    if (lastFetchOk) {
+      updatePrinterUI();
+    } else {
+      updateClockUI();
+      lastClockRefresh = millis();
+    }
+  }
+
+  if (!lastFetchOk && millis() - lastClockRefresh >= clockRefreshMs) {
+    lastClockRefresh = millis();
+    updateClockUI();
   }
 }

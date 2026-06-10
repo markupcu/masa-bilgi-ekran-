@@ -10,14 +10,17 @@ ESP32 + TFT_eSPI ekran ile Moonraker/Klipper yazıcı durumunu izleyen Arduino p
 - Kart tabanlı, daha okunaklı ve renkli bir arayüz kullanır.
 - Tüm ekranı sürekli silmek yerine sadece değişen alanları güncelleyerek titreme/yanıp sönmeyi azaltır.
 - WiFi koparsa bloklamadan tekrar bağlanmayı dener.
+- Moonraker erişilemezse yazıcı ekranından masa saati ekranına geçer.
+- Yazıcı yeniden erişilebilir olduğunda otomatik olarak yazıcı paneline döner.
 - Moonraker HTTP veya JSON hatalarını ekranda kısa durum mesajı olarak gösterir.
 
 ## Kurulum
 
 1. Arduino IDE veya PlatformIO'da ESP32 kart desteğini kurun.
-2. Aşağıdaki kütüphaneleri yükleyin:
+2. Saat/tarih için ESP32 internete çıkabilmeli; varsayılan saat dilimi Türkiye için UTC+3 olarak ayarlanmıştır.
+3. Aşağıdaki kütüphaneleri yükleyin:
    - `TFT_eSPI`
    - `ArduinoJson`
-3. `MasaBilgiEkran/MasaBilgiEkran.ino` içindeki `ssid`, `password` ve `moonrakerIP` değerlerini kendi ağınıza göre değiştirin.
-4. `TFT_eSPI` ayarlarınızda ekran sürücünüzün ve pinlerinizin doğru tanımlandığından emin olun.
-5. ESP32'ye yükleyin.
+4. `MasaBilgiEkran/MasaBilgiEkran.ino` içindeki `ssid`, `password`, `moonrakerIP` ve gerekirse NTP saat dilimi değerlerini kendi ağınıza göre değiştirin.
+5. `TFT_eSPI` ayarlarınızda ekran sürücünüzün ve pinlerinizin doğru tanımlandığından emin olun.
+6. ESP32'ye yükleyin.
